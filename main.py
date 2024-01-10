@@ -54,7 +54,7 @@ class LibrarianSaint(discord.Client):
         if await self.db.contains(USER.user_id == str(message.author.id)):
             # create coroutine to avoid blocking
             self.loop.create_task(self.player_message_relay(str(message.author.id), message.content))
-        await message.delete()
+            await message.delete()
     
     async def setup_hook(self):
         # setup coroutine along with on_ready()
@@ -111,7 +111,7 @@ class LibrarianSaint(discord.Client):
                             # break the loop
                             break
                         case _:
-                            self.logger.error(f"ws:recv: {msg}")
+                            self.logger.warning(f"ws:recv: {msg}")
     
     async def write_message(self, response: str):
         # remove 42 from string, load the array into json

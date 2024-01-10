@@ -51,10 +51,11 @@ class LibrarianSaint(discord.Client):
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
 
     async def on_message(self, message):
-        if await self.db.contains(USER.user_id == str(message.author.id)):
-            # create coroutine to avoid blocking
-            self.loop.create_task(self.player_message_relay(str(message.author.id), message.content))
-            await message.delete()
+        if message.channel == self.channel:
+            if await self.db.contains(USER.user_id == str(message.author.id)):
+                # create coroutine to avoid blocking
+                self.loop.create_task(self.player_message_relay(str(message.author.id), message.content))
+                await message.delete()
     
     async def setup_hook(self):
         # setup coroutine along with on_ready()

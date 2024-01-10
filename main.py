@@ -164,7 +164,7 @@ class LibrarianSaint(discord.Client):
             account_id = login_info['account_id']
             session_id = login_info['session_id']
             login = "https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={}".format(user_data['nutaku_id'])
-            login_p = { "server_prefix": SERVER_PREFIX, "account_id": account_id, "session_id": session_id }
+            login_p = { "server_prefix": user_data['prefix'], "account_id": account_id, "session_id": session_id }
             server_req = requests.post(login, login_p)
             new_token = str(server_req.json()['response']['socket_token'])
             new_ts = datetime.now(UTC).timestamp()

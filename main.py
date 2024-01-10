@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from datetime import datetime, UTC
 from contextlib import suppress
 from pathlib import Path
+from asynctinydb import TinyDB, Query
 import discord
 from emoji import DISCORD_EMOJI
 
@@ -17,9 +18,10 @@ load_dotenv()
 SECRET = os.environ["SECRET"]
 GUILD = os.environ["GUILD"]
 CHANNEL = os.environ["CHANNEL"]
-NUTAKU_ID = os.environ["NUTAKU_ID"]
-SERVER_PREFIX = os.environ["SERVER_PREFIX"]
+STORAGE = os.environ["STORAGE"]
+WSS_URI = "wss://ntk-chat.kokmm.net/socket.io/?a={}&EIO=4&transport=websocket"
 ALBUMS = Path.cwd().joinpath('albums')
+USER = Query()
 
 def discord_handler():
     handler = logging.handlers.RotatingFileHandler(
@@ -33,34 +35,41 @@ def discord_handler():
     handler.setFormatter(formatter)
     return handler
 
-def init_token() -> str:
-    account = 'https://ntk-login-api.kokmm.net/api/auth/login/game_account'
-    account_p = { "login_id": NUTAKU_ID, "login_type": 0, "access_token": "", "pw": NUTAKU_ID }
-    login_req = requests.post(account, account_p)
-    login_info = login_req.json()['response']
-    account_id = login_info['account_id']
-    session_id = login_info['session_id']
-    login = f"https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={NUTAKU_ID}"
-    login_p = { "server_prefix": SERVER_PREFIX, "account_id": account_id, "session_id": session_id }
-    server_req = requests.post(login, login_p)
-    return str(server_req.json()['response']['socket_token'])
-
 class LibrarianSaint(discord.Client):
     def __init__(self):
-        super().__init__(intents = discord.Intents.default())
+        intents = discord.Intents.default()
+        intents.message_content = True  
+        super().__init__(intents=intents)
         self.synced = False
         self.logger = logging.getLogger('discord')
         self.logger.setLevel(logging.INFO)
         if not self.logger.handlers:
             self.logger.addHandler(discord_handler())
+        self.db = TinyDB(STORAGE)
 
     async def on_ready(self):
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
+
+    async def on_message(self, message):
+        if await self.db.contains(USER.user_id == str(message.author.id)):
+            # create coroutine to avoid blocking
+            self.loop.create_task(self.player_message_relay(str(message.author.id), message.content))
+        await message.delete()
     
     async def setup_hook(self):
-        self.loop.create_task(self.relay_chat())
+        # setup coroutine along with on_ready()
+        self.loop.create_task(self.server_message_relay())
 
-    async def relay_chat(self):
+    async def player_message_relay(self, user_id, message):
+        token = await self.verify_token(user_id)
+        url = WSS_URI.replace('{}', token)
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send('40')
+            await ws.recv()
+            await ws.send(f"42[\"public message\", \"{message}\"]")
+
+    async def server_message_relay(self):
         # wait self.on_ready()
         await self.wait_until_ready()
         if not self.synced:
@@ -73,8 +82,9 @@ class LibrarianSaint(discord.Client):
             self.synced = True
 
         while not self.is_closed():
-            new_url = "wss://ntk-chat.kokmm.net/socket.io/?a={}&EIO=4&transport=websocket".format(init_token())
-            async with websockets.connect(new_url) as ws:
+            token = await self.verify_token('0')
+            url = WSS_URI.replace('{}', token)
+            async with websockets.connect(url) as ws:
                 r = await ws.recv()
                 self.logger.info(f"ws:recv: {r}")
                 await ws.send('40')
@@ -93,7 +103,7 @@ class LibrarianSaint(discord.Client):
                             self.logger.info(f"ws:recv: {msg}")
                         case '42':
                             try:
-                                await self.send_message(msg) 
+                                await self.write_message(msg) 
                             except Exception as e:
                                 self.logger.error(f"{e}")
                         case '44':
@@ -102,10 +112,8 @@ class LibrarianSaint(discord.Client):
                             break
                         case _:
                             self.logger.error(f"ws:recv: {msg}")
-                # close the websockets
-                ws.close()
     
-    async def send_message(self, response: str):
+    async def write_message(self, response: str):
         # remove 42 from string, load the array into json
         array = json.loads(response[2:])
         match array[0]:
@@ -143,6 +151,30 @@ class LibrarianSaint(discord.Client):
                 return
             case _:
                 return
+
+    async def verify_token(self, user_id) -> str:
+        user_data = await self.db.get(USER.user_id == user_id)
+
+        if datetime.now(UTC).timestamp() - user_data['create_time'] > 43200:
+            self.logger.info(f"updating (User: {user_id}) token...")
+            account = 'https://ntk-login-api.kokmm.net/api/auth/login/game_account'
+            account_p = { "login_id": user_data['nutaku_id'], "login_type": 0, "access_token": "", "pw": user_data['nutaku_id']}
+            login_req = requests.post(account, account_p)
+            login_info = login_req.json()['response']
+            account_id = login_info['account_id']
+            session_id = login_info['session_id']
+            login = "https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={}".format(user_data['nutaku_id'])
+            login_p = { "server_prefix": SERVER_PREFIX, "account_id": account_id, "session_id": session_id }
+            server_req = requests.post(login, login_p)
+            new_token = str(server_req.json()['response']['socket_token'])
+            new_ts = datetime.now(UTC).timestamp()
+            await self.db.update({ 'token': new_token, 'create_time': new_ts }, USER.user_id == user_id)
+            self.logger.info(f"(User: {user_id}) token has been updated.")
+
+            return new_token
+        else:
+            return user_data['token']
+
 
 if __name__ == '__main__':
     with suppress(KeyboardInterrupt):

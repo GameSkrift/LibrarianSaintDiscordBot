@@ -65,10 +65,10 @@ class LibrarianSaint(discord.Client):
         await self.wait_until_ready()
         if not self.synced:
             # Nutaku™ King of Kinks EN Community discord
-            self.guild = self.get_guild(GUILD)
+            self.guild = self.get_guild(int(GUILD))
             self.logger.info(f"{self.user.name} is connected to {self.guild}")
             # serves on world-chat channel
-            self.channel = self.get_channel(CHANNEL)
+            self.channel = self.get_channel(int(CHANNEL))
             self.logger.info(f"{self.user.name} is serving on {self.channel}")
             self.synced = True
 

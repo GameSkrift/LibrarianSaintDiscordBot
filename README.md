@@ -17,10 +17,16 @@ To install the development version, do the following:
 git clone https://github.com/GameSkrift/LibrarianSaintDiscordBot
 cd LibrarianSaintDiscordBot
 pip3 install -r requirements.txt
+# see the other code snippet 
 touch .env
-# you're required to provide SECRET, GUILD, CHANNEL, NUTAKU_ID env variables by yourself
-echo "*variables*" > .env
 python3 main.py
+```
+To be mentioned user has to provide own `.env` file in project root directory, with required constant variables:
+```python
+SECRET = #secret token of discord bot which can be found in Developer Portal.
+GUILD = #copy discord server ID
+CHANNEL = #copy channel ID
+STORAGE = #JSON filepath used by TinyDB
 ```
 
 ## DISCLAIMER

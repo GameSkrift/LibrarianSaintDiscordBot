@@ -121,7 +121,7 @@ class LibrarianSaint(discord.Client):
             # world channel
             case "receive message":
                 sender = array[1]['sender']
-                player_icon = "Pet{}_Album.png".format(sender['icon'][:4])
+                player_icon = "herocard_{}.jpg".format(sender['icon'][:4])
                 for fname in os.listdir(ALBUMS):
                     if fname == player_icon:
                         full_path = ALBUMS.joinpath(fname)

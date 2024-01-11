@@ -93,26 +93,26 @@ class LibrarianSaint(discord.Client):
                 #await ws.recv()
                 #await ws.send('42["public message", "Hello World from discord.gg/king-of-kinks"]')
 
-                while True:
-                    msg = await ws.recv()
-                    match msg[:2]:
-                        case '2':
-                            self.logger.debug("ws:recv: 2")
-                            await ws.send('3')
-                            self.logger.debug("ws:send: 3")
-                        case '40':
-                            self.logger.info(f"ws:recv: {msg}")
-                        case '42':
-                            try:
+                while not self.is_closed():
+                    try:
+                        msg = await ws.recv()
+                        match msg[:2]:
+                            case '2':
+                                self.logger.debug("ws:recv: 2")
+                                await ws.send('3')
+                                self.logger.debug("ws:send: 3")
+                            case '40':
+                                self.logger.info(f"ws:recv: {msg}")
+                            case '42':
                                 await self.write_message(msg) 
-                            except Exception as e:
-                                self.logger.error(f"{e}")
-                        case '44':
-                            self.logger.error(f"ws:recv: {msg}")
-                            # break the loop
-                            break
-                        case _:
-                            self.logger.warning(f"ws:recv: {msg}")
+                            case '44':
+                                self.logger.error(f"ws:recv: {msg}")
+                                break
+                            case _:
+                                self.logger.warning(f"ws:recv: {msg}")
+                    except Exception as e:
+                        self.logger.error(f"ws:exception: {e}")
+                        break
     
     async def write_message(self, response: str):
         # remove 42 from string, load the array into json
@@ -156,7 +156,7 @@ class LibrarianSaint(discord.Client):
     async def verify_token(self, user_id) -> str:
         user_data = await self.db.get(USER.user_id == user_id)
 
-        if datetime.now(UTC).timestamp() - user_data['create_time'] > 43200:
+        if datetime.now(UTC).timestamp() - user_data['create_time'] > 21600:
             self.logger.info(f"updating (User: {user_id}) token...")
             account = 'https://ntk-login-api.kokmm.net/api/auth/login/game_account'
             account_p = { "login_id": user_data['nutaku_id'], "login_type": 0, "access_token": "", "pw": user_data['nutaku_id']}

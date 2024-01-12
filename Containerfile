@@ -15,12 +15,16 @@ RUN useradd \
   --shell /bin/bash \
   runner
 
+USER runner 
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY \
+  --chown=runner:runner \
+  --chmod=700 \
+  . .
 
 FROM builder
-CMD ["python3", "main.py"]
+ENTRYPOINT ["python3", "main.py"]

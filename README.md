@@ -9,6 +9,7 @@ Librarian Saint Eimi is a open source Discord bot coded in Python3 with [discord
 - [x] Relay public messages from game server to discord channel.
 - [x] Allow discord user to send messages to game public chat server.
 - [x] Allow discord user to mention player by replying to discord embeded message.
+- [x] Partial support of discord emojis on game public chat server.
 - [ ] Support admin commands to manage subscriber database with basic ACID instructions.
 
 ## Installation

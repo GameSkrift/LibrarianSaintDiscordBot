@@ -51,11 +51,14 @@ class LibrarianSaint(discord.Client):
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
 
     async def on_message(self, message):
-        if message.channel == self.channel:
-            if await self.db.contains(USER.user_id == str(message.author.id)):
-                # create coroutine to avoid blocking
-                self.loop.create_task(self.player_message_relay(str(message.author.id), message.content))
-                await message.delete()
+        if message.channel == self.channel and await self.db.contains(USER.user_id == str(message.author.id)):
+            content = message.content
+            if message.reference and message.reference.resolved.author.id == self.user.id:
+                embed = message.reference.resolved.embeds[0]
+                content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+            # create coroutine to avoid blocking
+            self.loop.create_task(self.player_message_relay(str(message.author.id), content))
+            await message.delete()
     
     async def setup_hook(self):
         # setup coroutine along with on_ready()
@@ -137,11 +140,11 @@ class LibrarianSaint(discord.Client):
                     message = message.replace(e_id, emoji)
 
                 # create embedded message
-                embedded = discord.Embed(title=sender['username'], color=discord.Color.blue())
+                embedded = discord.Embed(title="[KOK+{}] {}".format(int(sender['server']) - 100, sender['username']), description=sender['username'], color=discord.Color.blue())
                 embedded.set_thumbnail(url=f"attachment://{player_icon}")
-                embedded.add_field(name="Server", value="S{}".format(int(sender['server']) - 100), inline=True)
                 embedded.add_field(name="Level", value=sender['lv'], inline=True)
                 embedded.add_field(name="VIP", value=sender['vip_level'], inline=True)
+                embedded.add_field(name="UUID", value=sender['user_id'], inline=False)
                 embedded.add_field(name="Public Message", value=message, inline=False)
                 embedded.set_footer(text=f"message sent at {create_time}")
                 if file:

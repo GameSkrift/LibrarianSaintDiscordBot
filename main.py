@@ -12,7 +12,7 @@ from pathlib import Path
 from asynctinydb import TinyDB, Query
 import discord
 from discord.ext import commands
-from emoji import DISCORD_EMOJI
+from emoji import KOK_EMOJI, UNICODE_EMOJI
 
 load_dotenv()
 # use environ API to raise Exception if variable doesn't exist
@@ -74,6 +74,10 @@ class LibrarianSaint(commands.Bot):
         self.loop.create_task(self.server_message_relay())
 
     async def player_message_relay(self, user_id, message):
+        # convert unicode to kok emoji if exists
+        for uid, kok_id in UNICODE_EMOJI.items():
+            message = message.replace(uid, kok_id)
+
         token = await self.verify_token(user_id)
         url = WSS_URI.replace('{}', token)
         async with websockets.connect(url) as ws:
@@ -145,8 +149,8 @@ class LibrarianSaint(commands.Bot):
                 # remove in-game attribute, escape characters
                 message = message.replace('<event=player, ', '<').replace('\"', '*')
                 # replace in-game emojis with discord emojis
-                for e_id, emoji in DISCORD_EMOJI.items():
-                    message = message.replace(e_id, emoji)
+                for kok_id, discord_id in KOK_EMOJI.items():
+                    message = message.replace(kok_id, discord_id)
 
                 # create embedded message
                 embedded = discord.Embed(title="[KOK+{}] {}".format(int(sender['server']) - 100, sender['username']), description=sender['username'], color=discord.Color.blue())

@@ -11,6 +11,7 @@ from contextlib import suppress
 from pathlib import Path
 from asynctinydb import TinyDB, Query
 import discord
+from discord.ext import commands
 from emoji import DISCORD_EMOJI
 
 load_dotenv()
@@ -35,11 +36,11 @@ def discord_handler():
     handler.setFormatter(formatter)
     return handler
 
-class LibrarianSaint(discord.Client):
+class LibrarianSaint(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True  
-        super().__init__(intents=intents)
+        super().__init__(command_prefix='.', intents=intents)
         self.synced = False
         self.logger = logging.getLogger('discord')
         self.logger.setLevel(logging.INFO)
@@ -53,12 +54,15 @@ class LibrarianSaint(discord.Client):
     async def on_message(self, message):
         if message.channel == self.channel:
             if await self.db.contains(USER.user_id == str(message.author.id)):
-                content = message.content.replace('\"', '*').replace('\'', '*')
-                if message.reference and message.reference.resolved.author.id == self.user.id:
-                    embed = message.reference.resolved.embeds[0]
-                    content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
-                # create coroutine to avoid blocking
-                self.loop.create_task(self.player_message_relay(str(message.author.id), content))
+                if message.mentions:
+                    await self.channel.send(f"<@{message.author.id}> Mention discord users is prohibited and will not work in game. Please use reply on embedded message that contains player name you want to mention.", delete_after=5, mention_author=True)
+                else:
+                    content = message.content.replace('\"', '*')
+                    if message.reference and message.reference.resolved.author.id == self.user.id:
+                        embed = message.reference.resolved.embeds[0]
+                        content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+                    # create coroutine to avoid blocking
+                    self.loop.create_task(self.player_message_relay(str(message.author.id), content))
                 await message.delete()
             else:
                 if message.author.id != self.user.id:
@@ -139,7 +143,7 @@ class LibrarianSaint(discord.Client):
                 message = array[1]['message']
                 self.logger.info(f"ws:world: {message}")
                 # remove in-game attribute, escape characters
-                message = message.replace('<event=player, ', '<').replace('\"', '*').replace('\'', '*')
+                message = message.replace('<event=player, ', '<').replace('\"', '*')
                 # replace in-game emojis with discord emojis
                 for e_id, emoji in DISCORD_EMOJI.items():
                     message = message.replace(e_id, emoji)

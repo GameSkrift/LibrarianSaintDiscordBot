@@ -11,7 +11,6 @@ from contextlib import suppress
 from pathlib import Path
 from asynctinydb import TinyDB, Query
 import discord
-from discord.ext import commands
 from emoji import KOK_EMOJI, UNICODE_EMOJI
 
 load_dotenv()
@@ -36,11 +35,11 @@ def discord_handler():
     handler.setFormatter(formatter)
     return handler
 
-class LibrarianSaint(commands.Bot):
+class LibrarianSaint(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True  
-        super().__init__(command_prefix='.', intents=intents)
+        super().__init__(intents=intents)
         self.synced = False
         self.logger = logging.getLogger('discord')
         self.logger.setLevel(logging.INFO)
@@ -55,7 +54,7 @@ class LibrarianSaint(commands.Bot):
         if message.channel == self.channel:
             if await self.db.contains(USER.user_id == str(message.author.id)):
                 if message.mentions and not message.reference:
-                    await self.channel.send(f"<@{message.author.id}> Mention discord users is prohibited and will not work in game. Please use reply on embedded message that contains player name you want to mention.", delete_after=5, mention_author=True)
+                    await self.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
                 else:
                     content = message.content.replace('\"', '*')
                     if message.reference and message.reference.resolved.author.id == self.user.id:

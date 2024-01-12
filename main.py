@@ -54,7 +54,7 @@ class LibrarianSaint(commands.Bot):
     async def on_message(self, message):
         if message.channel == self.channel:
             if await self.db.contains(USER.user_id == str(message.author.id)):
-                if message.mentions:
+                if message.mentions and not message.reference:
                     await self.channel.send(f"<@{message.author.id}> Mention discord users is prohibited and will not work in game. Please use reply on embedded message that contains player name you want to mention.", delete_after=5, mention_author=True)
                 else:
                     content = message.content.replace('\"', '*')

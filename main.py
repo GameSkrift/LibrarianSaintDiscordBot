@@ -51,14 +51,19 @@ class LibrarianSaint(discord.Client):
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
 
     async def on_message(self, message):
-        if message.channel == self.channel and await self.db.contains(USER.user_id == str(message.author.id)):
-            content = message.content
-            if message.reference and message.reference.resolved.author.id == self.user.id:
-                embed = message.reference.resolved.embeds[0]
-                content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
-            # create coroutine to avoid blocking
-            self.loop.create_task(self.player_message_relay(str(message.author.id), content))
-            await message.delete()
+        if message.channel == self.channel:
+            if await self.db.contains(USER.user_id == str(message.author.id)):
+                content = message.content
+                if message.reference and message.reference.resolved.author.id == self.user.id:
+                    embed = message.reference.resolved.embeds[0]
+                    content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+                # create coroutine to avoid blocking
+                self.loop.create_task(self.player_message_relay(str(message.author.id), content))
+                await message.delete()
+            else:
+                if message.author.id != self.user.id:
+                    await self.channel.send(f"Sorry <@{message.author.id}> ~ Eimi only delivers message for my beloved subscribers ･ﾟ･(｡>ω<｡)･ﾟ･", delete_after=5, mention_author=True)
+                    await message.delete()
     
     async def setup_hook(self):
         # setup coroutine along with on_ready()
@@ -135,6 +140,8 @@ class LibrarianSaint(discord.Client):
                 self.logger.info(f"ws:world: {message}")
                 # remove HTML attribute
                 message = message.replace('<event=player, ', '<')
+                # replace \" with \'
+                message = message.replace('\"', '\'')
                 # replace in-game emojis with discord emojis
                 for e_id, emoji in DISCORD_EMOJI.items():
                     message = message.replace(e_id, emoji)

@@ -4,7 +4,7 @@ LABEL \
   org.opencontainers.image.author="Sheldon Knuth <sheruost@duck.com>" \
   org.opencontainers.image.licenses=GPL-3.0 \
   com.github.GameSkrift="LibrarianSaintDiscordBot" \
-  version="0.2" \
+  version="0.3" \
   description="A discord bot transfers user messages between Nutaku™ King of Kinks websocket server and discord channel."
 
 # Create a new user

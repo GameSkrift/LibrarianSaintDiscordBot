@@ -6,6 +6,7 @@ import logging.handlers
 import json
 import os
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 from datetime import datetime, UTC
 from contextlib import suppress
 from pathlib import Path
@@ -17,10 +18,13 @@ load_dotenv()
 # use environ API to raise Exception if variable doesn't exist
 SECRET = os.environ["SECRET"]
 GUILD = os.environ["GUILD"]
-CHANNEL = os.environ["CHANNEL"]
-STORAGE = os.environ["STORAGE"]
+PUBLIC_CHANNEL = os.environ["PUBLIC_CHANNEL"]
+GUILD_CHANNELS = os.environ["GUILD_CHANNELS"]
+SUBSCRIBER_LIST = os.environ["SUBSCRIBER_LIST"]
+GUILD_LIST = os.environ["GUILD_LIST"]
 WSS_URI = "wss://ntk-chat.kokmm.net/socket.io/?a={}&EIO=4&transport=websocket"
 ALBUMS = Path.cwd().joinpath('albums')
+SERVER_TZ = ZoneInfo(key='America/Puerto_Rico')
 USER = Query()
 
 def discord_handler():
@@ -40,21 +44,21 @@ class LibrarianSaint(discord.Client):
         intents = discord.Intents.default()
         intents.message_content = True  
         super().__init__(intents=intents)
-        self.synced = False
         self.logger = logging.getLogger('discord')
         self.logger.setLevel(logging.INFO)
         if not self.logger.handlers:
             self.logger.addHandler(discord_handler())
-        self.db = TinyDB(STORAGE)
+        self.subscriber_list = TinyDB(SUBSCRIBER_LIST)
+        self.sync_guild = False
 
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
 
-    async def on_message(self, message):
-        if message.channel == self.channel:
-            if await self.db.contains(USER.user_id == str(message.author.id)):
+    async def on_message(self, message) -> None:
+        if message.channel == self.public_channel:
+            if await self.subscriber_list.contains(USER.user_id == str(message.author.id)):
                 if message.mentions and not message.reference:
-                    await self.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
+                    await message.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
                 else:
                     content = message.content.replace('\"', '*')
                     if message.reference and message.reference.resolved.author.id == self.user.id:
@@ -65,14 +69,19 @@ class LibrarianSaint(discord.Client):
                 await message.delete()
             else:
                 if message.author.id != self.user.id:
-                    await self.channel.send(f"Sorry <@{message.author.id}> ~ Eimi only delivers message for my beloved subscribers ･ﾟ･(｡>ω<｡)･ﾟ･", delete_after=5, mention_author=True)
+                    await message.channel.send(f"Sorry <@{message.author.id}> ~ Eimi only delivers message for my beloved subscribers ･ﾟ･(｡>ω<｡)･ﾟ･", delete_after=5, mention_author=True)
                     await message.delete()
+        elif str(message.channel) in GUILD_CHANNELS:
+            await message.delete()
+            # TODO
     
-    async def setup_hook(self):
-        # setup coroutine along with on_ready()
+    async def setup_hook(self) -> None:
+        # setup coroutine before on_ready(), however all coroutine tasks will wait_until_ready() to start
         self.loop.create_task(self.server_message_relay())
+        for channel in GUILD_CHANNELS:
+            self.loop.create_task(self.guild_message_relay(channel))
 
-    async def player_message_relay(self, user_id, message):
+    async def player_message_relay(self, user_id, message) -> None:
         # convert unicode to kok emoji if exists
         for uid, kok_id in UNICODE_EMOJI.items():
             message = message.replace(uid, kok_id)
@@ -85,17 +94,17 @@ class LibrarianSaint(discord.Client):
             await ws.recv()
             await ws.send(f"42[\"public message\", \"{message}\"]")
 
-    async def server_message_relay(self):
+    async def server_message_relay(self) -> None:
         # wait self.on_ready()
         await self.wait_until_ready()
-        if not self.synced:
+        if not self.sync_guild:
             # Nutaku™ King of Kinks EN Community discord
             self.guild = self.get_guild(int(GUILD))
             self.logger.info(f"{self.user.name} is connected to {self.guild}")
             # serves on world-chat channel
-            self.channel = self.get_channel(int(CHANNEL))
-            self.logger.info(f"{self.user.name} is serving on {self.channel}")
-            self.synced = True
+            self.public_channel = self.get_channel(int(PUBLIC_CHANNEL))
+            self.logger.info(f"{self.user.name} is serving on {self.public_channel}")
+            self.sync_guild=True
 
         while not self.is_closed():
             token = await self.verify_token('0')
@@ -128,21 +137,29 @@ class LibrarianSaint(discord.Client):
                     except Exception as e:
                         self.logger.error(f"ws:exception: {e}")
                         break
+
+    async def guild_message_relay(self, channel) -> None:
+        # wait self.on_ready()
+        await self.wait_until_ready()
+        # TODO
+
+    def _get_discord_file(self, icon_name):
+        for fname in os.listdir(ALBUMS):
+            if fname == icon_name:
+                full_path = ALBUMS.joinpath(fname)
+                file = discord.File(full_path, icon_name)
+                return file
+        return None
     
-    async def write_message(self, response: str):
+    async def write_message(self, response: str, channel=None):
         # remove 42 from string, load the array into json
         array = json.loads(response[2:])
         match array[0]:
-            # world channel
+            # public channel
             case "receive message":
                 sender = array[1]['sender']
                 player_icon = "herocard_{}.jpg".format(sender['icon'][:4])
-                for fname in os.listdir(ALBUMS):
-                    if fname == player_icon:
-                        full_path = ALBUMS.joinpath(fname)
-                        file = discord.File(full_path, player_icon)
-                #create_time = datetime.utcfromtimestamp(array[1]['msg_time']).strftime('%H:%M:%S')
-                create_time = datetime.fromtimestamp(array[1]['msg_time'], UTC).strftime('%H:%M:%S')
+                create_time = datetime.fromtimestamp(array[1]['msg_time']).astimezone(SERVER_TZ).strftime('%H:%M:%S')
                 message = array[1]['message']
                 self.logger.info(f"ws:world: {message}")
                 # remove in-game attribute, escape characters
@@ -152,24 +169,54 @@ class LibrarianSaint(discord.Client):
                     message = message.replace(kok_id, discord_id)
 
                 # create embedded message
-                embedded = discord.Embed(title="[KOK+{}] {}".format(int(sender['server']) - 100, sender['username']), description=sender['username'], color=discord.Color.blue())
+                if await self.subscriber_list.contains(USER.uuid == sender['user_id']):
+                    colour = discord.Colour.yellow()
+                else:
+                    colour = discord.Colour.blue()
+                embedded = discord.Embed(title="[KOK+{}] {}".format(int(sender['server']) - 100, sender['username']), description=sender['username'], colour=colour)
                 embedded.set_thumbnail(url=f"attachment://{player_icon}")
                 embedded.add_field(name="Level", value=sender['lv'], inline=True)
                 embedded.add_field(name="VIP", value=sender['vip_level'], inline=True)
                 embedded.add_field(name="UUID", value=sender['user_id'], inline=False)
                 embedded.add_field(name="Public Message", value=message, inline=False)
-                embedded.set_footer(text=f"message sent at {create_time}")
-                if file:
-                    await self.channel.send(file=file, embed=embedded)
+                embedded.set_footer(text=f"message sent at {create_time} EDT")
+                file = self._get_discord_file(player_icon)
+                await self.public_channel.send(file=file, embed=embedded)
+            # guild channel 
+            case 'receive guild message':
+                sender = array[1]['sender']
+                player_icon = "herocard_{}.jpg".format(sender['icon'][:4])
+                create_time = datetime.fromtimestamp(array[1]['msg_time']).astimezone(SERVER_TZ).strftime('%H:%M:%S')
+                message = array[1]['message']
+                self.logger.info(f"ws:world: {message}")
+                # remove in-game attribute, escape characters
+                message = message.replace('<event=player, ', '<').replace('\"', '*')
+                # replace in-game emojis with discord emojis
+                for kok_id, discord_id in KOK_EMOJI.items():
+                    message = message.replace(kok_id, discord_id)
+
+                # create embedded message
+                if await self.subscriber_list.contains(USER.uuid == sender['user_id']):
+                    colour = discord.Colour.yellow()
                 else:
-                    await self.channel.send(embed=embedded)
+                    colour = discord.Colour.blue()
+                embedded = discord.Embed(title="[KOK+{}] {}".format(int(sender['server']) - 100, sender['username']), description=sender['username'], colour=colour)
+                embedded.set_thumbnail(url=f"attachment://{player_icon}")
+                embedded.add_field(name="Level", value=sender['lv'], inline=True)
+                embedded.add_field(name="VIP", value=sender['vip_level'], inline=True)
+                embedded.add_field(name="UUID", value=sender['user_id'], inline=False)
+                embedded.add_field(name="Guild Message", value=message, inline=False)
+                embedded.set_footer(text=f"message sent at {create_time} EDT")
+                file = self._get_discord_file(player_icon)
+                await channel.send(file=file, embed=embedded)
+
             case 'capture country':
                 return
             case _:
                 return
 
     async def verify_token(self, user_id) -> str:
-        user_data = await self.db.get(USER.user_id == user_id)
+        user_data = await self.subscriber_list.get(USER.user_id == user_id)
 
         if datetime.now(UTC).timestamp() - user_data['create_time'] > 21600:
             self.logger.info(f"updating (User: {user_id}) token...")
@@ -180,11 +227,11 @@ class LibrarianSaint(discord.Client):
             account_id = login_info['account_id']
             session_id = login_info['session_id']
             login = "https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={}".format(user_data['nutaku_id'])
-            login_p = { "server_prefix": user_data['prefix'], "account_id": account_id, "session_id": session_id }
+            login_p = { "server_prefix": user_data['uuid'][:3], "account_id": account_id, "session_id": session_id }
             server_req = requests.post(login, login_p)
             new_token = str(server_req.json()['response']['socket_token'])
             new_ts = datetime.now(UTC).timestamp()
-            await self.db.update({ 'token': new_token, 'create_time': new_ts }, USER.user_id == user_id)
+            await self.subscriber_list.update({ 'token': new_token, 'create_time': new_ts }, USER.user_id == user_id)
             self.logger.info(f"(User: {user_id}) token has been updated.")
 
             return new_token

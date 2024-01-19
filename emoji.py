@@ -73,7 +73,7 @@ KOK_EMOJI = {
     '#72': ':persevere:',
     '#73': ':angry:',
     '#74': ':relieved:',
-    '#75': ':face_with_symbol_over_mouth:',
+    '#75': ':face_with_symbols_over_mouth:',
     '#76': ':exploding_head:',
     '#77': ':sleeping:',
     '#78': ':sleepy:',

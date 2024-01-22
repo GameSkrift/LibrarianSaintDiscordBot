@@ -53,7 +53,7 @@ KOK_EMOJI = {
     '#52': ':face_vomiting:',
     '#53': ':open_mouth:',
     '#54': ':rolling_eyes:',
-    '#55': ':stuck_out_tongue_closed_eye:',
+    '#55': ':stuck_out_tongue_closed_eyes:',
     '#56': ':stuck_out_tongue_winking_eye:',
     '#57': ':stuck_out_tongue:',
     '#58': ':thermometer_face:',

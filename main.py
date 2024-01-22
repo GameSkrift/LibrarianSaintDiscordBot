@@ -55,22 +55,32 @@ class LibrarianSaint(discord.Client):
         self.logger.info(f"Discord bot has logged in as {self.user.name}")
 
     async def on_message(self, message) -> None:
+        bot_message = True if message.author.id == self.user.id else False
+        news_channel = True if message.channel.type == discord.ChannelType.news else False
         if message.channel == self.public_channel:
-            if await self.subscriber_list.contains(USER.user_id == str(message.author.id)):
-                if message.mentions and not message.reference:
-                    await message.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
-                else:
-                    content = message.content.replace('\"', '*')
+            if bot_message:
+                if news_channel:
+                    # publish the message on news channel
+                    await message.publish()
+            elif await self.subscriber_list.contains(USER.user_id == str(message.author.id)):
+                content = message.content.replace('\"', '*')
+                await message.delete()
+                # user can only reply to bot message
+                if message.mentions:
                     if message.reference and message.reference.resolved.author.id == self.user.id:
                         embed = message.reference.resolved.embeds[0]
-                        content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+                        message = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+                        # create coroutine to avoid blocking
+                        self.loop.create_task(self.player_message_relay(str(message.author.id), message))
+                    else:
+                        await message.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
+                        return
+                else:
                     # create coroutine to avoid blocking
                     self.loop.create_task(self.player_message_relay(str(message.author.id), content))
-                await message.delete()
             else:
-                if message.author.id != self.user.id:
-                    await message.channel.send(f"Sorry <@{message.author.id}> ~ Eimi only delivers message for my beloved subscribers ･ﾟ･(｡>ω<｡)･ﾟ･", delete_after=5, mention_author=True)
-                    await message.delete()
+                await message.delete()
+                await message.channel.send(f"Sorry <@{message.author.id}> ~ Eimi only delivers message for my beloved subscribers ･ﾟ･(｡>ω<｡)･ﾟ･", delete_after=5, mention_author=True)
         elif str(message.channel) in GUILD_CHANNELS:
             await message.delete()
             # TODO

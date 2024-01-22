@@ -25,12 +25,14 @@ pip3 install -r requirements.txt
 touch .env
 python3 main.py
 ```
-To be mentioned user has to provide own `.env` file in project root directory, with required constant variables:
+To be mentioned user has to provide own `.env` file in project root directory, with required constants by following:
 ```python
 SECRET = #secret token of discord bot which can be found in Developer Portal.
-GUILD = #copy discord server ID
+SERVER = #copy discord server ID
 CHANNEL = #copy channel ID
-STORAGE = #JSON filepath used by TinyDB
+STORAGE = #JSON filename of game user accounts
+GUILD_CHANNELS = [] #list of alternative channels for guild messages
+GUILD_LIST = #JSON filename of game guild ids
 ```
 
 ## DISCLAIMER

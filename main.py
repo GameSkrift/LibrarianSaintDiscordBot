@@ -17,10 +17,10 @@ from emoji import KOK_EMOJI, UNICODE_EMOJI
 load_dotenv()
 # use environ API to raise Exception if variable doesn't exist
 SECRET = os.environ["SECRET"]
-GUILD = os.environ["GUILD"]
-PUBLIC_CHANNEL = os.environ["PUBLIC_CHANNEL"]
+GUILD = os.environ["SERVER"]
+PUBLIC_CHANNEL = os.environ["CHANNEL"]
+SUBSCRIBER_LIST = os.environ["STORAGE"]
 GUILD_CHANNELS = os.environ["GUILD_CHANNELS"]
-SUBSCRIBER_LIST = os.environ["SUBSCRIBER_LIST"]
 GUILD_LIST = os.environ["GUILD_LIST"]
 WSS_URI = "wss://ntk-chat.kokmm.net/socket.io/?a={}&EIO=4&transport=websocket"
 ALBUMS = Path.cwd().joinpath('albums')

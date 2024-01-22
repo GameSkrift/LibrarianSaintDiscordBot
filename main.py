@@ -69,9 +69,9 @@ class LibrarianSaint(discord.Client):
                 if message.mentions:
                     if message.reference and message.reference.resolved.author.id == self.user.id:
                         embed = message.reference.resolved.embeds[0]
-                        message = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
+                        content = "<event=player, {}>@{} {}".format(embed.fields[2].value, embed.description, content)
                         # create coroutine to avoid blocking
-                        self.loop.create_task(self.player_message_relay(str(message.author.id), message))
+                        self.loop.create_task(self.player_message_relay(str(message.author.id), content))
                     else:
                         await message.channel.send(f"<@{message.author.id}> Please reply to my embedded message that contains the player name you want to mention instead.", delete_after=5, mention_author=True)
                         return

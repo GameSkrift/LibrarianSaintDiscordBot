@@ -7,7 +7,7 @@ import json
 import os
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
-from datetime import datetime, UTC
+from datetime import datetime
 from contextlib import suppress
 from pathlib import Path
 from asynctinydb import TinyDB, Query
@@ -228,7 +228,7 @@ class LibrarianSaint(discord.Client):
     async def verify_token(self, user_id) -> str:
         user_data = await self.subscriber_list.get(USER.user_id == user_id)
 
-        if datetime.now(UTC).timestamp() - user_data['create_time'] > 21600:
+        if datetime.now().timestamp() - user_data['create_time'] > 21600:
             self.logger.info(f"updating (User: {user_id}) token...")
             account = 'https://ntk-login-api.kokmm.net/api/auth/login/game_account'
             account_p = { "login_id": user_data['nutaku_id'], "login_type": 0, "access_token": "", "pw": user_data['nutaku_id']}
@@ -240,7 +240,7 @@ class LibrarianSaint(discord.Client):
             login_p = { "server_prefix": user_data['uuid'][:3], "account_id": account_id, "session_id": session_id }
             server_req = requests.post(login, login_p)
             new_token = str(server_req.json()['response']['socket_token'])
-            new_ts = datetime.now(UTC).timestamp()
+            new_ts = datetime.now().timestamp()
             await self.subscriber_list.update({ 'token': new_token, 'create_time': new_ts }, USER.user_id == user_id)
             self.logger.info(f"(User: {user_id}) token has been updated.")
 

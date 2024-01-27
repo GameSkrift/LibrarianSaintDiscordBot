@@ -27,18 +27,6 @@ ALBUMS = Path.cwd().joinpath('albums')
 SERVER_TZ = ZoneInfo(key='America/Puerto_Rico')
 USER = Query()
 
-def discord_handler():
-    handler = logging.handlers.RotatingFileHandler(
-        filename='discord.log',
-        encoding='utf-8',
-        maxBytes=32 * 1024 * 1024,  # 32 MiB
-        backupCount=5,  # Rotate through 5 files
-    )
-    dt_fmt = '%Y-%m-%d %H:%M:%S'
-    formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
-    handler.setFormatter(formatter)
-    return handler
-
 class LibrarianSaint(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -46,8 +34,6 @@ class LibrarianSaint(discord.Client):
         super().__init__(intents=intents)
         self.logger = logging.getLogger('discord')
         self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            self.logger.addHandler(discord_handler())
         self.subscriber_list = TinyDB(SUBSCRIBER_LIST)
         self.sync_guild = False
 
@@ -245,7 +231,7 @@ class LibrarianSaint(discord.Client):
 
             await self.subscriber_list.update({ 'token': str(new_token), 'create_time': int(new_ts) }, USER.user_id == user_id)
             self.logger.info(f"(User: {user_id}) token has been updated.")
-            return new_token
+            return str(new_token)
         else:
             return user_data['token']
 

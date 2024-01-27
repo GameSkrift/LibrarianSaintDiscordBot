@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import requests
 import websockets
 import logging
 import logging.handlers
@@ -11,6 +10,7 @@ from datetime import datetime
 from contextlib import suppress
 from pathlib import Path
 from asynctinydb import TinyDB, Query
+import aiohttp
 import discord
 from emoji import KOK_EMOJI, UNICODE_EMOJI
 
@@ -117,18 +117,17 @@ class LibrarianSaint(discord.Client):
             self.sync_guild=True
 
         while not self.is_closed():
-            token = await self.verify_token('0')
-            url = WSS_URI.replace('{}', token)
-            async with websockets.connect(url) as ws:
-                r = await ws.recv()
-                self.logger.info(f"ws:recv: {r}")
-                await ws.send('40')
-                self.logger.info("ws:send: 40")
-                #await ws.recv()
-                #await ws.send('42["public message", "Hello World from discord.gg/king-of-kinks"]')
-
-                while not self.is_closed():
-                    try:
+            token = await self.verify_token('0', force_update=True)
+            uri = WSS_URI.replace('{}', token)
+            try:
+                async with websockets.connect(uri) as ws:
+                    r = await ws.recv()
+                    self.logger.info(f"ws:recv: {r}")
+                    await ws.send('40')
+                    self.logger.info("ws:send: 40")
+                    #await ws.recv()
+                    #await ws.send('42["public message", "Hello World from discord.gg/king-of-kinks"]')
+                    while not self.is_closed():
                         msg = await ws.recv()
                         match msg[:2]:
                             case '2':
@@ -144,9 +143,8 @@ class LibrarianSaint(discord.Client):
                                 break
                             case _:
                                 self.logger.warning(f"ws:recv: {msg}")
-                    except Exception as e:
-                        self.logger.error(f"ws:exception: {e}")
-                        break
+            except Exception as e:
+                self.logger.error(f"ws:exception: {e}")
 
     async def guild_message_relay(self, channel) -> None:
         # wait self.on_ready()
@@ -225,25 +223,28 @@ class LibrarianSaint(discord.Client):
             case _:
                 return
 
-    async def verify_token(self, user_id) -> str:
+    async def verify_token(self, user_id, force_update=False) -> str:
         user_data = await self.subscriber_list.get(USER.user_id == user_id)
 
-        if datetime.now().timestamp() - user_data['create_time'] > 21600:
+        if datetime.now().timestamp() - user_data['create_time'] > 21600 or force_update:
             self.logger.info(f"updating (User: {user_id}) token...")
             account = 'https://ntk-login-api.kokmm.net/api/auth/login/game_account'
             account_p = { "login_id": user_data['nutaku_id'], "login_type": 0, "access_token": "", "pw": user_data['nutaku_id']}
-            login_req = requests.post(account, account_p)
-            login_info = login_req.json()['response']
-            account_id = login_info['account_id']
-            session_id = login_info['session_id']
-            login = "https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={}".format(user_data['nutaku_id'])
-            login_p = { "server_prefix": user_data['uuid'][:3], "account_id": account_id, "session_id": session_id }
-            server_req = requests.post(login, login_p)
-            new_token = str(server_req.json()['response']['socket_token'])
-            new_ts = datetime.now().timestamp()
-            await self.subscriber_list.update({ 'token': new_token, 'create_time': new_ts }, USER.user_id == user_id)
-            self.logger.info(f"(User: {user_id}) token has been updated.")
+            async with aiohttp.ClientSession() as session:
+                async with session.post(account, data=account_p) as resp:
+                    resp_body = await resp.json()
+                    login_info = resp_body['response']
+                account_id = login_info['account_id']
+                session_id = login_info['session_id']
+                login = "https://ntk-login-api.kokmm.net/api/auth/login/user?nutaku_id={}".format(user_data['nutaku_id'])
+                login_p = { "server_prefix": user_data['uuid'][:3], "account_id": account_id, "session_id": session_id }
+                async with session.post(login, data=login_p) as resp:
+                    resp_body = await resp.json()
+                    new_token = resp_body['response']['socket_token']
+                    new_ts = datetime.now().timestamp()
 
+            await self.subscriber_list.update({ 'token': str(new_token), 'create_time': int(new_ts) }, USER.user_id == user_id)
+            self.logger.info(f"(User: {user_id}) token has been updated.")
             return new_token
         else:
             return user_data['token']
